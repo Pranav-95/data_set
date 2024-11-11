@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Charity Donation</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #2980b9;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+        }
+        button:hover:not(:disabled) {
+            background-color: #3498db;
+            transform: translateY(-2px);
+        }
+        h2 {
+            margin-top: 30px;
+            color: #34495e;
+            font-size: 2rem;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 20px 0;
+            width: 100%;
+            max-width: 500px;
+        }
+        li {
+            background-color: #ecf0f1;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            font-size: 16px;
+            text-align: left; /* Align text to the left */
+        }
+        li:hover {
+            background-color: #d5d8dc;
+        }
+        #account {
+            margin: 15px 0;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2rem;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+            input[type="text"], input[type="number"], button {
+                width: 90%; /* Full width on small screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Charity Donation</h1>
+    <p id="account">Connect MetaMask to proceed</p>
+    <button id="connectButton">Connect to MetaMask</button>
+    <br><br>
+    
+    <input type="text" id="donorName" placeholder="Enter your name" required>
+    <input type="number" id="amount" placeholder="Enter donation amount (in Ether)" required step="any">
+    <button id="donateButton" disabled>Donate</button>
+    
+    <h2>Donations List</h2>
+    <ul id="donationsList"></ul>
+
+    <script>
+        let web3;
+        let account;
+        let charityContract;
+
+        window.addEventListener('load', async () => {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                await ethereum.request({ method: 'eth_requestAccounts' });
+
+                // Fetch contract ABI and address dynamically from the backend
+                const response = await fetch('/contract-info');
+                const contractInfo = await response.json();
+                
+                const contractABI = contractInfo.abi;
+                const contractAddress = contractInfo.address;
+
+                charityContract = new web3.eth.Contract(contractABI, contractAddress);
+                document.getElementById('connectButton').disabled = false;
+                loadDonations();
+            } else {
+                alert('Please install MetaMask to interact with the DApp.');
+            }
+        });
+
+        document.getElementById('connectButton').addEventListener('click', async () => {
+            const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+            account = accounts[0];
+            document.getElementById('account').innerText = `Connected: ${account}`;
+            document.getElementById('donateButton').disabled = false;
+        });
+
+        document.getElementById('donateButton').addEventListener('click', async () => {
+            const donorName = document.getElementById('donorName').value;
+            const amountInEther = document.getElementById('amount').value;
+            const amountInWei = web3.utils.toWei(amountInEther, 'ether');
+            
+            await charityContract.methods.donate(donorName).send({ from: account, value: amountInWei });
+            alert('Donation successful!');
+            loadDonations(); // Refresh the donations list
+        });
+
+        async function loadDonations() {
+            const donations = await charityContract.methods.getAllDonations().call();
+            const donationsList = document.getElementById('donationsList');
+            donationsList.innerHTML = ''; // Clear the current list
+
+            donations.forEach(donation => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${donation.name} donated ${web3.utils.fromWei(donation.amount, 'ether')} Ether`;
+                donationsList.appendChild(listItem);
+            });
+        }
+    </script>
+</body>
+</html>
